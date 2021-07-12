@@ -1,0 +1,7 @@
+nib.js:
+Nib in javascript.
+
+The purpose of this repository is to serve as a lightweight javascript imple-
+mentation of the array programming language nib ( https://codeberg.org/Wezl/nib
+).
+
