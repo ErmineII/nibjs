@@ -4,11 +4,11 @@ function err(msg, str) {
   // consider using the string to gather debug information
 }
 
-/*!*/ export const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
-/*!*/ export const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
+const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
+const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
 
 /* [token, rest, type] = next_token(original); */
-/*!*/ export function next_token(str) {
+function next_token(str) {
   str = eat_whitespace(str);
   let match;
   if ( match = // https://stackoverflow.com/a/13340826/
@@ -28,13 +28,13 @@ function err(msg, str) {
   return match.slice(1); // omit the entire string matched
 }
 
-/*!*/ export function peek(str, types) {
+function peek(str, types) {
   if (!token_available(str)) { return false; }
   let [_, rest, type] = next_token(str);
   return types.includes(type) && (rest || ' ');
 }
 
-/*!*/ export function parse_name_or_paren(str) {
+function parse_name_or_paren(str) {
   let [token, rest, type] = next_token(str);
   if (type === 'name') {
      return [['name', token], rest];
@@ -53,7 +53,7 @@ const value_available = str => peek(str, ['number', 'string', '$']);
    ['string', str] = val;
    ['delay', var] = val;
  */
-/*!*/ export function parse_value(orig) {
+function parse_value(orig) {
   let [token, str, type] = next_token(orig);
   if (is_constant(type)) {
     return [[type, token], str];
@@ -68,7 +68,7 @@ const value_available = str => peek(str, ['number', 'string', '$']);
 /* [app, rest] = parse_application(string);
    ['monadic', func] = app;
    ['dyadic', func, arg] = app; */
-/*!*/ export function parse_application(orig) {
+function parse_application(orig) {
   let [func, str] = parse_name_or_paren(orig),
       argument, token, type, rest;
   while (value_available(str)) {
@@ -89,7 +89,7 @@ const value_available = str => peek(str, ['number', 'string', '$']);
 }
 
 /* [constant or null, applications, rest] = parse_subexpression(string) */
-/*!*/ export function parse_subexpression(str) {
+function parse_subexpression(str) {
   let token, rest, type, constant = null, applications = [], app;
   if (value_available(str)) {
     [constant, str] = parse_value(str)
@@ -127,7 +127,7 @@ export function parse_expression(str) {
 
 /* [['parenthesis', expression], rest] = parse_parenthesis(string);
    [['array', expressions], rest] = parse_parenthesis(string); */
-/*!*/ export function parse_parenthesis(orig) {
+function parse_parenthesis(orig) {
   let str, expr, rest;
   if (!(str = peek(orig, ["("]))) {
     let [next, _, __] = next_token(orig);
