@@ -1,9 +1,4 @@
 
-function err(msg, str) {
-  throw new Error(msg);
-  // consider using the string to gather debug information
-}
-
 const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
 const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
 
@@ -17,15 +12,15 @@ function next_token(str) {
     match.push('number');
   } else if (match = str.match(/^("(?:[^"]|"")+")(.*)/)) {
     match.push('string');
-  } else if (match = str.match(/^(\$:|[():;$])(.*)/)) {
+  } else if (match = str.match(/^([$:]:?|[();])(.*)/)) {
     match.push(match[1]);
   } else if (match = str.match(/^([^$(){}:; \n\t"`]+)(.*)/)) {
     match.push('name');
   } else {
-    err( 'Invalid character sequence: '
-       + str.replace(/^([^ \t\n]{1,20})(.*)/, "$1..."), str);
+    err('Token expected'+(str? '.' : ' but found EOF.'), str);
   }
-  return match.slice(1); // omit the entire string matched
+  return match.slice(1);
+  // omit the entire string matched that str.match include in the result
 }
 
 function peek(str, types) {
@@ -37,11 +32,23 @@ function peek(str, types) {
 function parse_name_or_paren(str) {
   let [token, rest, type] = next_token(str);
   if (type === 'name') {
-     return [['name', token], rest];
+    let path = [token];
+    str = rest;
+    while (rest = peek(str, ['::'])) {
+      str = rest;
+      [token, rest, type] = next_token(str);
+      if (type === 'name') {
+        path.push(token);
+        str = rest;
+      } else {
+        err('Field expected.', str);
+      }
+    }
+    return [['name', path], str];
   } else if (type === '(') {
-     return parse_parenthesis(str);
+    return parse_parenthesis(str);
   } else {
-    err('Expected name or parenthesis but got '+token, str);
+    err('Expected name or parenthesis.', str);
   }
 }
 
@@ -61,7 +68,7 @@ function parse_value(orig) {
     let [func, rest] = parse_name_or_paren(str);
     return [['delay', func], rest];
   } else {
-    err('Expected value but got '+token, orig);
+    err('Expected value', orig);
   }
 }
 
@@ -73,7 +80,7 @@ function parse_application(orig) {
       argument, token, type, rest;
   while (value_available(str)) {
     [argument, str] = parse_value(str);
-    func = ['partial', func, argument];
+    func = ['dyadic', func, argument];
   }
   if ( rest = peek(str, [':']) ) {
     str = rest;
@@ -131,7 +138,7 @@ function parse_parenthesis(orig) {
   let str, expr, rest;
   if (!(str = peek(orig, ["("]))) {
     let [next, _, __] = next_token(orig);
-    err("parenthesis expected, got "+next, orig);
+    err("parenthesis expected", orig);
   }
   [expr, rest] = parse_expression(str);
   if (str = peek(rest, [";"])) {
@@ -152,8 +159,51 @@ function parse_parenthesis(orig) {
       return [['parenthesis', expr], str];
     } else {
       let [next, _, __] = next_token(rest);
-      err("close parenthesis expected, got "+next, rest);
+      err("close parenthesis expected", rest);
     }
+  }
+}
+
+function err(msg, str) {
+  throw [msg, str];
+}
+
+export function display_syntax_error (origstr, err) {
+  let msg, str;
+  try {
+    [msg, str] = err;
+    str = eat_whitespace(str);
+  } catch (e) {
+    throw err;
+  }
+  let len;
+  try {
+    len = (next_token(str)[0]+'').length;
+  } catch {
+    len = 1;
+  }
+  const offset  = origstr.length - str.length,
+        before  = origstr.substring(offset-20, offset)
+                         .replace(/.*\n/g,""),
+        after   = origstr.substring(offset, offset+Math.max(40,len))
+                         .replace(/\n.*/g,"");
+  [str,origstr,len,offset,before,after].forEach(a=>console.log(a));
+  return (
+`${msg}
+  ${ before                    }${ after           }
+  ${ ' '.repeat(before.length) }${ '^'.repeat(len) }` );
+}
+
+export function parse_friendly(str) {
+  str = `${str}`;
+  try {
+    let [expr, rest] = parse_expression(str); // may error
+    if (token_available(rest)) {
+      err('Unexpected', rest);
+    }
+    return expr;
+  } catch (e) {
+    throw new Error(display_syntax_error(str, e));
   }
 }
 
