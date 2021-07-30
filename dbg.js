@@ -1,11 +1,13 @@
-import * as nib from "./nib.js";
+import * as Nib from "./nib.js";
 
-globalThis.n = nib
+globalThis.n = Nib;
+
+[globalThis.t, globalThis.p, globalThis.l] = [n.Type, n.Parse, n.Library];
 
 globalThis.s = [ // samples
   "    a  ",
   "   -2 - a.2 0 .3 ",
   " } { +12 16 -> ",
   ' "asdf" "str_with_""s"'
-]
+];
 
