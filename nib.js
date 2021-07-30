@@ -1,4 +1,4 @@
-import { parse_expression } from "./parser.js";
+import * as parse from "./parser.js";
 
-export { parse_expression };
+export { parse };
 

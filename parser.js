@@ -2,8 +2,8 @@
 const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
 const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
 
-/* [token, rest, type] = next_token(original); */
-function next_token(str) {
+/* [token, rest, type] = get_token(original); */
+function get_token(str) {
   str = eat_whitespace(str);
   let match;
   if ( match = // https://stackoverflow.com/a/13340826/
@@ -25,18 +25,18 @@ function next_token(str) {
 
 function peek(str, types) {
   if (!token_available(str)) { return false; }
-  let [_, rest, type] = next_token(str);
+  let [_, rest, type] = get_token(str);
   return types.includes(type) && (rest || ' ');
 }
 
-function parse_name_or_paren(str) {
-  let [token, rest, type] = next_token(str);
+function name_or_paren(str) {
+  let [token, rest, type] = get_token(str);
   if (type === 'name') {
     let path = [token];
     str = rest;
     while (rest = peek(str, ['::'])) {
       str = rest;
-      [token, rest, type] = next_token(str);
+      [token, rest, type] = get_token(str);
       if (type === 'name') {
         path.push(token);
         str = rest;
@@ -46,7 +46,7 @@ function parse_name_or_paren(str) {
     }
     return [['name', path], str];
   } else if (type === '(') {
-    return parse_parenthesis(str);
+    return parenthesis(str);
   } else {
     err('Expected name or parenthesis.', str);
   }
@@ -55,39 +55,39 @@ function parse_name_or_paren(str) {
 const is_constant = type => type === 'number' || type === 'string';
 const value_available = str => peek(str, ['number', 'string', '$']);
 
-/* [val, rest] = parse_value(str);
+/* [val, rest] = value(str);
    ['number', num] = val;
    ['string', str] = val;
    ['delay', var] = val;
  */
-function parse_value(orig) {
-  let [token, str, type] = next_token(orig);
+function value(orig) {
+  let [token, str, type] = get_token(orig);
   if (is_constant(type)) {
     return [[type, token], str];
   } else if (type === '$') {
-    let [func, rest] = parse_name_or_paren(str);
+    let [func, rest] = name_or_paren(str);
     return [['delay', func], rest];
   } else {
     err('Expected value', orig);
   }
 }
 
-/* [app, rest] = parse_application(string);
+/* [app, rest] = application(string);
    ['monadic', func] = app;
    ['dyadic', func, arg] = app; */
-function parse_application(orig) {
-  let [func, str] = parse_name_or_paren(orig),
+function application(orig) {
+  let [func, str] = name_or_paren(orig),
       argument, token, type, rest;
   while (value_available(str)) {
-    [argument, str] = parse_value(str);
+    [argument, str] = value(str);
     func = ['dyadic', func, argument];
   }
   if ( rest = peek(str, [':']) ) {
     str = rest;
     if (value_available(str)) {
-      [argument, str] = parse_value(str)
+      [argument, str] = value(str)
     } else {
-      [argument, str] = parse_application(str);
+      [argument, str] = application(str);
     }
     return [['dyadic', func, argument], str];
   } else {
@@ -95,22 +95,22 @@ function parse_application(orig) {
   }
 }
 
-/* [constant or null, applications, rest] = parse_subexpression(string) */
-function parse_subexpression(str) {
+/* [constant or null, applications, rest] = subexpression(string) */
+function subexpression(str) {
   let token, rest, type, constant = null, applications = [], app;
   if (value_available(str)) {
-    [constant, str] = parse_value(str)
+    [constant, str] = value(str)
   }
   while (peek(str, ['name', '('])) {
-    [app, str] = parse_application(str);
+    [app, str] = application(str);
     applications.push(app);
   }
   return [constant, applications, str];
 }
 
-/* [expression, rest] = parse_expression(string);
+/* [expression, rest] = expression(string);
    ['expression', vars, vals, constant, applications] = expression; */
-export function parse_expression(str) {
+export function expression(str) {
   let vars = [],
       vals = [],
       constant = null,
@@ -118,11 +118,11 @@ export function parse_expression(str) {
       tok,
       rest;
   do {
-    [constant, applications, str] = parse_subexpression(str);
+    [constant, applications, str] = subexpression(str);
     if (rest = peek(str, ['$:'])) {
       str = rest;
       let name;
-      [name, str] = parse_name_or_paren(str);
+      [name, str] = name_or_paren(str);
       vars.push(name);
       vals.push([constant, applications]);
     } else {
@@ -132,20 +132,20 @@ export function parse_expression(str) {
   return [['expression', vars, vals, constant, applications], str];
 }
 
-/* [['parenthesis', expression], rest] = parse_parenthesis(string);
-   [['array', expressions], rest] = parse_parenthesis(string); */
-function parse_parenthesis(orig) {
+/* [['parenthesis', expression], rest] = parenthesis(string);
+   [['array', expressions], rest] = parenthesis(string); */
+function parenthesis(orig) {
   let str, expr, rest;
   if (!(str = peek(orig, ["("]))) {
-    let [next, _, __] = next_token(orig);
+    let [next, _, __] = get_token(orig);
     err("parenthesis expected", orig);
   }
-  [expr, rest] = parse_expression(str);
+  [expr, rest] = expression(str);
   if (str = peek(rest, [";"])) {
     expr = [expr];
     while (!(rest = peek(str, [")"]))) {
       let element;
-      [element, str] = parse_expression(str);
+      [element, str] = expression(str);
       rest = peek(str, [";"]);
       if (!rest) {
         err("; expected in array", str);
@@ -158,7 +158,7 @@ function parse_parenthesis(orig) {
     if (str = peek(rest, [")"])) {
       return [['parenthesis', expr], str];
     } else {
-      let [next, _, __] = next_token(rest);
+      let [next, _, __] = get_token(rest);
       err("close parenthesis expected", rest);
     }
   }
@@ -178,7 +178,7 @@ export function display_syntax_error (origstr, err) {
   }
   let len;
   try {
-    len = (next_token(str)[0]+'').length;
+    len = (get_token(str)[0]+'').length;
   } catch {
     len = 1;
   }
@@ -187,7 +187,6 @@ export function display_syntax_error (origstr, err) {
                          .replace(/.*\n/g,""),
         after   = origstr.substring(offset, offset+Math.max(40,len))
                          .replace(/\n.*/g,"");
-  [str,origstr,len,offset,before,after].forEach(a=>console.log(a));
   return (
 `${msg}
   ${ before                    }${ after           }
@@ -197,7 +196,7 @@ export function display_syntax_error (origstr, err) {
 export function parse_friendly(str) {
   str = `${str}`;
   try {
-    let [expr, rest] = parse_expression(str); // may error
+    let [expr, rest] = expression(str); // may error
     if (token_available(rest)) {
       err('Unexpected', rest);
     }
