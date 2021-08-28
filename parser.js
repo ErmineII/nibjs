@@ -54,6 +54,7 @@ function name_or_paren(str) {
 
 const is_constant = type => type === 'number' || type === 'string';
 const value_available = str => peek(str, ['number', 'string', '$']);
+const argument_available = str => peek(str, ['number', 'string', '$', ':']);
 
 /* [val, rest] = value(str);
    ['number', num] = val;
@@ -72,27 +73,25 @@ function value(orig) {
   }
 }
 
+function argument(orig) {
+  let str = peek(orig, [':'])||orig, func;
+  if (value_available(str)) {
+    return value(str);
+  }
+  [func, str] = name_or_paren(str);
+  return [['apply', func, []], str];
+}
+
 /* [app, rest] = application(string);
-   ['monadic', func] = app;
-   ['dyadic', func, arg] = app; */
+   ['apply', func, args] = app; */
 function application(orig) {
   let [func, str] = name_or_paren(orig),
-      argument, token, type, rest;
-  while (value_available(str)) {
-    [argument, str] = value(str);
-    func = ['dyadic', func, argument];
+      arg, token, type, rest, args = [];
+  while (argument_available(str)) {
+    [arg, str] = argument(str);
+    args.push(arg);
   }
-  if ( rest = peek(str, [':']) ) {
-    str = rest;
-    if (value_available(str)) {
-      [argument, str] = value(str)
-    } else {
-      [argument, str] = application(str);
-    }
-    return [['dyadic', func, argument], str];
-  } else {
-    return [['monadic', func], str];
-  }
+  return [['apply', func, args], str];
 }
 
 /* [constant or null, applications, rest] = subexpression(string) */
