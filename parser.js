@@ -12,6 +12,8 @@ function get_token(str) {
     match.push('number');
   } else if (match = str.match(/^("(?:[^"]|"")+")(.*)/)) {
     match.push('string');
+  } else if (match = str.match(/^([$]"(?:[^"]|"")")(.*)/)) {
+    match.push('character');
   } else if (match = str.match(/^([$:]:?|[();])(.*)/)) {
     match.push(match[1]);
   } else if (match = str.match(/^([^$(){}:; \n\t"`]+)(.*)/)) {
@@ -52,13 +54,18 @@ function name_or_paren(str) {
   }
 }
 
-const is_constant = type => type === 'number' || type === 'string';
-const value_available = str => peek(str, ['number', 'string', '$']);
-const argument_available = str => peek(str, ['number', 'string', '$', ':']);
+const is_constant = type => type === 'number'
+                         || type === 'string'
+                         || type === 'character';
+const value_available =
+  str => peek(str, ['number', 'string', 'character', '$']);
+const argument_available =
+  str => peek(str, ['number', 'string', 'character', '$', ':']);
 
 /* [val, rest] = value(str);
    ['number', num] = val;
    ['string', str] = val;
+   ['character', str] = val;
    ['delay', var] = val;
  */
 function value(orig) {
@@ -123,12 +130,13 @@ export function expression(str) {
       let name;
       [name, str] = name_or_paren(str);
       vars.push(name);
-      vals.push([constant, applications]);
+      vals.push(['expression', constant, applications]);
     } else {
       break;
     }
   } while (true);
-  return [['expression', vars, vals, constant, applications], str];
+  let ret = ['expression', constant, applications];
+  return [vars.length !== 0 ? ['binding', vars, vals, ret] : ret, str];
 }
 
 /* [['parenthesis', expression], rest] = parenthesis(string);
