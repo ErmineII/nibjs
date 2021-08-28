@@ -139,7 +139,7 @@ export function expression(str) {
   return [vars.length !== 0 ? ['binding', vars, vals, ret] : ret, str];
 }
 
-/* [['parenthesis', expression], rest] = parenthesis(string);
+/* [expression, rest] = parenthesis(string);
    [['array', expressions], rest] = parenthesis(string); */
 function parenthesis(orig) {
   let str, expr, rest;
@@ -163,7 +163,7 @@ function parenthesis(orig) {
     return [['array', expr], rest];
   } else {
     if (str = peek(rest, [")"])) {
-      return [['parenthesis', expr], str];
+      return [expr, str];
     } else {
       let [next, _, __] = get_token(rest);
       err("close parenthesis expected", rest);
