@@ -116,7 +116,8 @@ function subexpression(str) {
 }
 
 /* [expression, rest] = expression(string);
-   ['expression', vars, vals, constant, applications] = expression; */
+   ['binding', vars, vals, scope_expression] = expression;
+   ['expression', constant, applications] = expression; */
 export function expression(str) {
   let vars = [],
       vals = [],

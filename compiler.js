@@ -20,6 +20,8 @@ import { pair, char, p_a, p_b, c_s } from "./values.js";
 
 */
 
+const unimpl = (str) => {throw new Error("unimplemented: "+str)};
+
 export class CodeBuilder {
   static argSym = Symbol("argument");
   constructor(stack, globals) {
@@ -40,12 +42,14 @@ export class CodeBuilder {
       this.stack.push(null);
       break;
     case "pair":
+    case "apply":
       this.stack.pop();
       this.stack.pop();
       this.stack.push(null);
       break;
     case "makearray":
-      this.stack = this.stack.slice(0, a.length - ops[0]);
+      this.stack = this.stack.slice(0, this.stack.length - ops[0]);
+      this.stack.pop(); // argument to array maker
       this.stack.push(null);
       break;
     }
@@ -80,8 +84,12 @@ export class CodeBuilder {
       }
       break;
     case "array":
-      array[1].forEach(expr => this.compile(expr));
-      this.instr`makearray ${array[1].length}`;
+      this.stack.push(CodeBuilder.argSym);
+      expr[1].forEach(elt => {
+        this.compile(["name", [CodeBuilder.argSym]]);
+        this.compile(elt);
+      });
+      this.instr`makearray ${expr[1].length}`;
       break;
     case "apply":
       expr[2].forEach(argument=>{
@@ -101,8 +109,25 @@ export class CodeBuilder {
         this.compile(expr[1]);
       }
       expr[2].forEach(application => this.compile(application));
+      break;
+    case "binding":
+      expr[2].forEach( (valExpr, indx) => {
+        let nameExpr = expr[1][indx];
+        this.compile(valExpr);
+        this.stack.pop();
+        if (nameExpr[0] === "name") {
+          this.stack.push(nameExpr[1][0]);
+          // TODO: handle assignment to name::field
+          if(nameExpr[1].length > 1) {
+            unimpl("tried to assign to field");
+          }
+        } else {
+          // TODO: handle pattern matching?
+          unimpl("tried to assign to expression");
+        }
+      })
+      this.compile(expr[3]);
     }
-    // TODO...
   }
   // toValue() {}
     // Becomes a function that can be used from nib
