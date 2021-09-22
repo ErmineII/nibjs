@@ -9,7 +9,7 @@
 function parse_(str) {
   str = str.replace(/ /g, "");
   let match, ret = null;
-  if (match = str.match(/^(Num|Bool|Int|Float|Char|Any|\$[a-z]+)/)) {
+  if (match = str.match(/^(Bool|Count|Int|Num|Char|Any|\$[a-z]+)/)) {
     match = match[0];
     str = str.substring(match.length);
     if (match[0] === "$") {

@@ -13,6 +13,7 @@ function get_token(str) {
   } else if (match = str.match(/^("(?:[^"]|"")+")(.*)/)) {
     match.push('string');
   } else if (match = str.match(/^([$]"(?:[^"]|"")")(.*)/)) {
+    match[1] = match[1][2];
     match.push('character');
   } else if (match = str.match(/^([$:]:?|[();])(.*)/)) {
     match.push(match[1]);
