@@ -12,12 +12,12 @@ function get_token(str) {
     match.push('number');
   } else if (match = str.match(/^("(?:[^"]|"")+")(.*)/)) {
     match.push('string');
-  } else if (match = str.match(/^([$]"(?:[^"]|"")")(.*)/)) {
+  } else if (match = str.match(/^([.]"(?:[^"]|"")")(.*)/)) {
     match[1] = match[1][2];
     match.push('character');
-  } else if (match = str.match(/^([$:]:?|[();])(.*)/)) {
+  } else if (match = str.match(/^([.:]:?|[();])(.*)/)) {
     match.push(match[1]);
-  } else if (match = str.match(/^([^$(){}:; \n\t"`]+)(.*)/)) {
+  } else if (match = str.match(/^([^.(){}:; \n\t"`]+)(.*)/)) {
     match.push('name');
   } else {
     err('Token expected'+(str? '.' : ' but found EOF.'), str);
@@ -59,9 +59,9 @@ const is_constant = type => type === 'number'
                          || type === 'string'
                          || type === 'character';
 const value_available =
-  str => peek(str, ['number', 'string', 'character', '$']);
+  str => peek(str, ['number', 'string', 'character', '.']);
 const argument_available =
-  str => peek(str, ['number', 'string', 'character', '$', ':']);
+  str => peek(str, ['number', 'string', 'character', '.', ':']);
 
 /* [val, rest] = value(str);
    ['number', num] = val;
@@ -73,7 +73,7 @@ function value(orig) {
   let [token, str, type] = get_token(orig);
   if (is_constant(type)) {
     return [[type, token], str];
-  } else if (type === '$') {
+  } else if (type === '.') {
     let [func, rest] = name_or_paren(str);
     return [['delay', func], rest];
   } else {
@@ -127,7 +127,7 @@ export function expression(str) {
       rest;
   do {
     [constant, applications, str] = subexpression(str);
-    if (rest = peek(str, ['$:'])) {
+    if (rest = peek(str, ['.:'])) {
       str = rest;
       let name;
       [name, str] = name_or_paren(str);
