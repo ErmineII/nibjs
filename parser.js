@@ -2,28 +2,36 @@
 const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
 const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
 
-/* [token, rest, type] = get_token(original); */
-function get_token(str) {
+function get_tokens(str) {
+  const total_length = str.length.
   str = eat_whitespace(str);
-  let match;
-  if ( match = // https://stackoverflow.com/a/13340826/
-        str.match(/^(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)(.*)/) ) {
-    match[1] = parseFloat(match[1]);
-    match.push('number');
-  } else if (match = str.match(/^("(?:[^"]|"")+")(.*)/)) {
-    match.push('string');
-  } else if (match = str.match(/^([.]"(?:[^"]|"")")(.*)/)) {
-    match[1] = match[1][2];
-    match.push('character');
-  } else if (match = str.match(/^([.:]:?|[();])(.*)/)) {
-    match.push(match[1]);
-  } else if (match = str.match(/^([^.(){}:; \n\t"`]+)(.*)/)) {
-    match.push('name');
-  } else {
-    err('Token expected'+(str? '.' : ' but found EOF.'), str);
+  let match,
+    types = [],
+    tokens = [],
+    positions = [];
+  while (str) {
+    if ( match = // https://stackoverflow.com/a/13340826/
+          str.match(/^(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/) ) {
+      types.push('number');
+      tokens.push(parseFloat(match[1]));
+    } else if (match = str.match(/^"((?:[^"]|"")+)"/)) {
+      types.push('string');
+      tokens.push(match[1].replace(/""/g, '"'));
+    } else if (match = str.match(/^[.]"([^"]|"")"/)) {
+      types.push('character');
+      tokens.push(match[1][0]);
+    } else if (match = str.match(/^([.:]:?|[()$])/)) {
+      types.push(match[1]);
+      tokens.push(match[1]);
+    } else if (match = str.match(/^([^.(){}:$ \n\t"`]+)/)) {
+      match.push('name');
+    } else {
+      err('Token expected'+(str? '.' : ' but found EOF.'), str);
+    }
+    positions.push(total_length - str.length);
+    str = eat_whitespace(str.slice(match[0].length));
   }
-  return match.slice(1);
-  // omit the entire string matched that str.match include in the result
+  return {types, tokens, positions}.
 }
 
 function peek(str, types) {
