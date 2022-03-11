@@ -1,225 +1,187 @@
 
-const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
-const token_available = str => ! /^(?:[ \t\n]|`[^`]*`)*$/.test(str);
+// example state:
+// str: ' `comment` "asdf" @: 0'
+// type: [ "string", "name", ":", "number" ]
+// value: [ "asdf", "@", ":", 0 ]
+// position: [ 11, 18, 19, 21 ]
+// tn: the index of the current token e.g. the ":" is at index 2
 
-function get_tokens(str) {
-  const total_length = str.length.
-  str = eat_whitespace(str);
-  let match,
-    types = [],
-    tokens = [],
-    positions = [];
-  while (str) {
-    if ( match = // https://stackoverflow.com/a/13340826/
-          str.match(/^(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/) ) {
-      types.push('number');
-      tokens.push(parseFloat(match[1]));
-    } else if (match = str.match(/^"((?:[^"]|"")+)"/)) {
-      types.push('string');
-      tokens.push(match[1].replace(/""/g, '"'));
-    } else if (match = str.match(/^[.]"([^"]|"")"/)) {
-      types.push('character');
-      tokens.push(match[1][0]);
-    } else if (match = str.match(/^([.:]:?|[()$])/)) {
-      types.push(match[1]);
-      tokens.push(match[1]);
-    } else if (match = str.match(/^([^.(){}:$ \n\t"`]+)/)) {
-      match.push('name');
-    } else {
-      err('Token expected'+(str? '.' : ' but found EOF.'), str);
+class Parser {
+  source_string;
+  types = [];
+  values = [];
+  positions = [];
+  tn = 0;
+
+  constructor(str) { this.source_string = str; }
+  static from_string = str => {
+    const parser = new Parser(str);
+    parser.init_from_string();
+    return parser;
+  }
+
+  init_from_string() {
+    let str = this.source_string;
+    const eat_whitespace = str => str.replace(/^(?:[ \t\n]|`[^`]*`)+/,"");
+    const add_token = (type, value) => {
+      this.types.push(type);
+      this.values.push(value);
     }
-    positions.push(total_length - str.length);
-    str = eat_whitespace(str.slice(match[0].length));
-  }
-  return {types, tokens, positions}.
-}
-
-function peek(str, types) {
-  if (!token_available(str)) { return false; }
-  let [_, rest, type] = get_token(str);
-  return types.includes(type) && (rest || ' ');
-}
-
-function name_or_paren(str) {
-  let [token, rest, type] = get_token(str);
-  if (type === 'name') {
-    let path = [token];
-    str = rest;
-    while (rest = peek(str, ['::'])) {
-      str = rest;
-      [token, rest, type] = get_token(str);
-      if (type === 'name') {
-        path.push(token);
-        str = rest;
-      } else {
-        err('Field expected.', str);
-      }
-    }
-    return [['name', path], str];
-  } else if (type === '(') {
-    return parenthesis(str);
-  } else {
-    err('Expected name or parenthesis.', str);
-  }
-}
-
-const is_constant = type => type === 'number'
-                         || type === 'string'
-                         || type === 'character';
-const value_available =
-  str => peek(str, ['number', 'string', 'character', '.']);
-const argument_available =
-  str => peek(str, ['number', 'string', 'character', '.', ':']);
-
-/* [val, rest] = value(str);
-   ['number', num] = val;
-   ['string', str] = val;
-   ['character', str] = val;
-   ['delay', var] = val;
- */
-function value(orig) {
-  let [token, str, type] = get_token(orig);
-  if (is_constant(type)) {
-    return [[type, token], str];
-  } else if (type === '.') {
-    let [func, rest] = name_or_paren(str);
-    return [['delay', func], rest];
-  } else {
-    err('Expected value', orig);
-  }
-}
-
-function argument(orig) {
-  let str = peek(orig, [':'])||orig, func;
-  if (value_available(str)) {
-    return value(str);
-  }
-  [func, str] = name_or_paren(str);
-  return [['apply', func, []], str];
-}
-
-/* [app, rest] = application(string);
-   ['apply', func, args] = app; */
-function application(orig) {
-  let [func, str] = name_or_paren(orig),
-      arg, token, type, rest, args = [];
-  while (argument_available(str)) {
-    [arg, str] = argument(str);
-    args.push(arg);
-  }
-  return [['apply', func, args], str];
-}
-
-/* [constant or null, applications, rest] = subexpression(string) */
-function subexpression(str) {
-  let token, rest, type, constant = null, applications = [], app;
-  if (value_available(str)) {
-    [constant, str] = value(str)
-  }
-  while (peek(str, ['name', '('])) {
-    [app, str] = application(str);
-    applications.push(app);
-  }
-  return [constant, applications, str];
-}
-
-/* [expression, rest] = expression(string);
-   ['binding', vars, vals, scope_expression] = expression;
-   ['expression', constant, applications] = expression; */
-export function expression(str) {
-  let vars = [],
-      vals = [],
-      constant = null,
-      applications = [],
-      tok,
-      rest;
-  do {
-    [constant, applications, str] = subexpression(str);
-    if (rest = peek(str, ['.:'])) {
-      str = rest;
-      let name;
-      [name, str] = name_or_paren(str);
-      vars.push(name);
-      vals.push(['expression', constant, applications]);
-    } else {
-      break;
-    }
-  } while (true);
-  let ret = ['expression', constant, applications];
-  return [vars.length !== 0 ? ['binding', vars, vals, ret] : ret, str];
-}
-
-/* [expression, rest] = parenthesis(string);
-   [['array', expressions], rest] = parenthesis(string); */
-function parenthesis(orig) {
-  let str, expr, rest;
-  if (!(str = peek(orig, ["("]))) {
-    let [next, _, __] = get_token(orig);
-    err("parenthesis expected", orig);
-  }
-  [expr, rest] = expression(str);
-  if (str = peek(rest, [";"])) {
-    expr = [expr];
-    while (!(rest = peek(str, [")"]))) {
-      let element;
-      [element, str] = expression(str);
-      rest = peek(str, [";"]);
-      if (!rest) {
-        err("; expected in array", str);
-      }
-      expr.push(element);
-      str = rest;
-    }
-    return [['array', expr], rest];
-  } else {
-    if (str = peek(rest, [")"])) {
-      return [expr, str];
-    } else {
-      let [next, _, __] = get_token(rest);
-      err("close parenthesis expected", rest);
-    }
-  }
-}
-
-function err(msg, str) {
-  throw [msg, str];
-}
-
-export function display_syntax_error (origstr, err) {
-  let msg, str;
-  try {
-    [msg, str] = err;
+    const total_length = str.length;
     str = eat_whitespace(str);
-  } catch (e) {
-    throw err;
-  }
-  let len;
-  try {
-    len = (get_token(str)[0]+'').length;
-  } catch {
-    len = 1;
-  }
-  const offset  = origstr.length - str.length,
-        before  = origstr.substring(offset-20, offset)
-                         .replace(/.*\n/g,""),
-        after   = origstr.substring(offset, offset+Math.max(40,len))
-                         .replace(/\n.*/g,"");
-  return (
-`${msg}
-  ${ before                    }${ after           }
-  ${ ' '.repeat(before.length) }${ '^'.repeat(len) }` );
-}
-
-export function parse_friendly(str) {
-  str = `${str}`;
-  try {
-    let [expr, rest] = expression(str); // may error
-    if (token_available(rest)) {
-      err('Unexpected', rest);
+    let match;
+    while (str) {
+      if ( match = // https://stackoverflow.com/a/13340826/
+            str.match(/^(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/) ) {
+        add_token('number', parseFloat(match[1]));
+      } else if (match = str.match(/^"((?:[^"]|"")+)"/)) {
+        add_token('string', match[1].replace(/""/g, '"'));
+      } else if (match = str.match(/^[.]"([^"]|"")"/)) {
+        add_token('character', match[1][0]);
+      } else if (match = str.match(/^([.:]:?|[()$])/)) {
+        add_token(match[1], null);
+      } else if (match = str.match(/^([^.(){}:$ \n\t"`]+)/)) {
+        add_token('name', match[1]);
+      } else {
+        err('Token expected'+(str? '.' : ' but found EOF.'), str);
+      }
+      this.positions.push(total_length - str.length);
+      str = eat_whitespace(str.slice(match[0].length));
     }
-    return expr;
-  } catch (e) {
-    throw new Error(display_syntax_error(str, e));
+  }
+  get type(){ return this.types[this.tn]; }
+  get value(){ return this.values[this.tn]; }
+  get position(){ return this.positions[this.tn]; }
+
+  advance() {
+    this.tn++;
+  }
+
+  peek(...types) {
+    return types.includes(this.type());
+  }
+  consume(type) {
+    if (this.type() === type) {
+      const val = this.value();
+      this.advance();
+    } else {
+      return null;
+    }
+  }
+  consumed() { return this.values[this.tn-1]; }
+
+  name_or_paren() {
+    if (this.consume('name')) {
+      let path = [this.consumed()];
+      while (this.consume('::')) {
+        if (this.consume('name')) {
+          path.push(this.consumed());
+        } else {
+          this.error('Field expected.');
+        }
+      }
+      return ['name', path];
+    } else if (this.peek('(', '$')) {
+      return this.parenthesis();
+    } else {
+      this.error('Expected name or parenthesis.');
+    }
+  }
+
+  static constant_tokens = ['number', 'string', 'character'];
+  value() {
+    if (this.peek(...constant_tokens)) {
+      const ret = [this.type(), this.value()]
+      this.advance();
+      return ret;
+    } else if (this.consume('.')) {
+      return ['delay', name_or_paren()];
+    } else {
+      this.error('Expected value');
+    }
+  }
+
+  argument() {
+    if (this.consume(':')) {
+      if (this.peek('name', '(', '$')) {
+        return ['apply', this.name_or_paren()];
+      }
+    }
+    return this.value();
+  }
+
+  application() {
+    let func = this.name_or_paren(), args = [];
+    while (this.peek(':', ...constant_tokens)) {
+      args.push(this.argument());
+    }
+    return ['apply', func, args];
+  }
+
+  subexpression() {
+    let constant = null, applications = [], app;
+    if (this.peek(...constant_tokens)) {
+      constant = this.value();
+    }
+    while (this.peek('name', '(')) {
+      applications.push(this.application());
+    }
+    return [constant, applications];
+  }
+
+  expression() {
+    const vars = [], vals = [];
+    let constant = null,
+        applications = [];
+    [constant, applications] = this.subexpression();
+    while (this.consume('.:')) {
+      if (!this.consume('name')) {
+        this.error('target expected for assignment');
+      }
+      vars.push(this.consumed());
+      vals.push(['expression', constant, applications]);
+      [constant, applications] = this.subexpression();
+    }
+    const ret = ['expression', constant, applications];
+    return vars.length !== 0 ? ['binding', vars, vals, ret] : ret;
+  }
+
+  parenthesis() {
+    if (this.consume('(')) {
+      const ret = this.expression();
+      if (!this.consume(')')) {
+        this.error('close parenthesis expected');
+      }
+      return ret;
+    } else if (this.consume('$')) {
+      return this.expression();
+    } else {
+      this.error('parenthesis expected');
+    }
+  }
+
+  const ParseError = class ParseError {
+    message;
+    parser;
+    constructor(m,p) {
+      this.message = m;
+      this.parser = p;
+    }
+    
+    pretty() {
+      const pos = this.position();
+      // TODO
+    }
+  };
+  error(message) {
+    throw new Parser.ParseError(message);
+  }
+  
+  parse() {
+    const expression = this.expression();
+    if (this.tn !== this.values.length) {
+      this.error('unexpected token');
+    }
+    return expression;
   }
 }
-
