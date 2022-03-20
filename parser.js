@@ -1,4 +1,3 @@
-
 // example state:
 // str: ' `comment` "asdf" @: 0'
 // type: [ "string", "name", ":", "number" ]
@@ -6,7 +5,7 @@
 // position: [ 11, 18, 19, 21 ]
 // tn: the index of the current token e.g. the ":" is at index 2
 
-class Parser {
+export class Parser {
   source_string;
   types = [];
   values = [];
@@ -39,19 +38,19 @@ class Parser {
       } else if (match = str.match(/^[.]"([^"]|"")"/)) {
         add_token('character', match[1][0]);
       } else if (match = str.match(/^([.:]:?|[()$])/)) {
-        add_token(match[1], null);
+        add_token(match[1], match[1]);
       } else if (match = str.match(/^([^.(){}:$ \n\t"`]+)/)) {
         add_token('name', match[1]);
       } else {
-        err('Token expected'+(str? '.' : ' but found EOF.'), str);
+        this.error('Token expected'+(str? '.' : ' but found EOF.'), str);
       }
       this.positions.push(total_length - str.length);
       str = eat_whitespace(str.slice(match[0].length));
     }
   }
-  get type(){ return this.types[this.tn]; }
-  get value(){ return this.values[this.tn]; }
-  get position(){ return this.positions[this.tn]; }
+  type(){ return this.types[this.tn]; }
+  value(){ return this.values[this.tn]; }
+  position(){ return this.positions[this.tn]; }
 
   advance() {
     this.tn++;
@@ -64,6 +63,7 @@ class Parser {
     if (this.type() === type) {
       const val = this.value();
       this.advance();
+      return val;
     } else {
       return null;
     }
@@ -89,8 +89,8 @@ class Parser {
   }
 
   static constant_tokens = ['number', 'string', 'character'];
-  value() {
-    if (this.peek(...constant_tokens)) {
+  parse_value() {
+    if (this.peek(...Parser.constant_tokens)) {
       const ret = [this.type(), this.value()]
       this.advance();
       return ret;
@@ -107,12 +107,12 @@ class Parser {
         return ['apply', this.name_or_paren()];
       }
     }
-    return this.value();
+    return this.parse_value();
   }
 
   application() {
     let func = this.name_or_paren(), args = [];
-    while (this.peek(':', ...constant_tokens)) {
+    while (this.peek(':', ...Parser.constant_tokens)) {
       args.push(this.argument());
     }
     return ['apply', func, args];
@@ -120,10 +120,10 @@ class Parser {
 
   subexpression() {
     let constant = null, applications = [], app;
-    if (this.peek(...constant_tokens)) {
-      constant = this.value();
+    if (this.peek(...Parser.constant_tokens)) {
+      constant = this.parse_value();
     }
-    while (this.peek('name', '(')) {
+    while (this.peek('name', '(', '$')) {
       applications.push(this.application());
     }
     return [constant, applications];
@@ -160,7 +160,7 @@ class Parser {
     }
   }
 
-  const ParseError = class ParseError {
+  static ParseError = class ParseError {
     message;
     parser;
     constructor(m,p) {
@@ -174,14 +174,16 @@ class Parser {
     }
   };
   error(message) {
-    throw new Parser.ParseError(message);
+    throw new Parser.ParseError(message, this);
   }
   
   parse() {
     const expression = this.expression();
     if (this.tn !== this.values.length) {
-      this.error('unexpected token');
+      this.error('Unexpected token');
     }
     return expression;
   }
 }
+
+export const parse = str => Parser.from_string(str).parse()
