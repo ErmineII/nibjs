@@ -95,7 +95,7 @@ export class Parser {
       this.advance();
       return ret;
     } else if (this.consume('.')) {
-      return ['delay', name_or_paren()];
+      return ['delay', this.name_or_paren()];
     } else {
       this.error('Expected value');
     }
@@ -112,7 +112,7 @@ export class Parser {
 
   application() {
     let func = this.name_or_paren(), args = [];
-    while (this.peek(':', ...Parser.constant_tokens)) {
+    while (this.peek(':', '.', ...Parser.constant_tokens)) {
       args.push(this.argument());
     }
     return ['apply', func, args];
