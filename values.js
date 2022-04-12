@@ -10,27 +10,35 @@
 
 */
 
-class Pair { // subject to change: may not be a class eventually
-  constructor(a, b) {
-    this.a = a;
-    this.b = b;
+const is_tuple_symbol = Symbol("tuple?");
+export const mktuple = (...a) => { a[is_tuple_symbol] = true; return a };
+export const mkpair = (a, b) => mktuple(a, b);
+
+export const is_pair = (obj) => obj[is_tuple_symbol];
+export const pair_l = (pair) => pair[0];
+export const pair_r = (pair) => {
+  if (pair.length > 2) {
+    const array = pair.slice(1);
+    array[is_tuple_symbol] = true;
+    return array;
+  } else {
+    return pair[1];
   }
 }
-export const pair = (a,b)=>new Pair(a,b), p_a = p=>p.a, p_b = p=>p.b;
 
 class Char {
   constructor(s) {
     this.s = s;
   }
 }
-export const char = s=>new Char(s), c_s = c=>c.s;
+export const mkchar = s=>new Char(s), char_string = c=>c.s;
 
 const is_iterable = v => Symbol.iterator in Object(v); // so/a/53106917/
 export function type_string(v) {
-  if (is_iterable(v)) {
-    return "array";
-  } else if (v instanceof Pair) {
+  if (is_pair(v)) {
     return "pair";
+  } else if (is_iterable(v)) {
+    return "array";
   } else if (v instanceof Char) {
     return "character";
   } else if (typeof v === "bigint") {
@@ -39,4 +47,3 @@ export function type_string(v) {
     return "number";
   }
 }
-

@@ -47,11 +47,6 @@ export class CodeBuilder {
       this.stack.pop();
       this.stack.push(null);
       break;
-    case "makearray":
-      this.stack = this.stack.slice(0, this.stack.length - ops[0]);
-      this.stack.pop(); // argument to array maker
-      this.stack.push(null);
-      break;
     }
   }
   compile(expr) {
@@ -82,14 +77,6 @@ export class CodeBuilder {
         newfunc.compile(expr[1]);
         this.instr`push ${newfunc.toValue()}`
       }
-      break;
-    case "array":
-      this.stack.push(CodeBuilder.argSym);
-      expr[1].forEach(elt => {
-        this.compile(["name", [CodeBuilder.argSym]]);
-        this.compile(elt);
-      });
-      this.instr`makearray ${expr[1].length}`;
       break;
     case "apply":
       expr[2].forEach(argument=>{
