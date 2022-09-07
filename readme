@@ -1,12 +1,20 @@
 nib.js:
 Nib in javascript.
 
-The purpose of this repository is to serve as a lightweight javascript imple-
-mentation of the array programming language nib ( https://codeberg.org/Wezl/nib
-).
+The purpose of this repository is to serve as a lightweight javascript
+implementation of the array programming language nib
+( https://codeberg.org/Wezl/nib ).
+
+The code uses modern ES6+ features. It has been developed and tested with
+QuickJS and Node.
+To use in a JS REPL:
+$ qjs -im dbg.js
+or
+$ npm run jsrepl
 
 [x] parser
 [~] compiler
+[ ] builtin datatypes
 [ ] interpreter
 [ ] builtin functions
 

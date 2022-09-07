@@ -1,0 +1,7 @@
+{
+  "main": "dbg.js",
+  "type": "module",
+  "scripts": {
+    "jsrepl":"node -e 'import(`./dbg.js`)' -i"
+  }
+}
