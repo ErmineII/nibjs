@@ -120,7 +120,7 @@ export class Parser {
 
   subexpression() {
     let constant = null, applications = [], app;
-    if (this.peek(...Parser.constant_tokens)) {
+    if (this.peek('.', ...Parser.constant_tokens)) {
       constant = this.parse_value();
     }
     while (this.peek('name', '(', '$')) {
