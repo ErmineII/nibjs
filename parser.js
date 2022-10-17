@@ -72,15 +72,15 @@ export class Parser {
 
   name_or_paren() {
     if (this.consume('name')) {
-      let path = [this.consumed()];
+      let ret = ['name', this.consumed()];
       while (this.consume('::')) {
         if (this.consume('name')) {
-          path.push(this.consumed());
+          ret.push(this.consumed());
         } else {
           this.error('Field expected.');
         }
       }
-      return ['name', path];
+      return ret;
     } else if (this.peek('(', '$')) {
       return this.parenthesis();
     } else {
@@ -104,7 +104,7 @@ export class Parser {
   argument() {
     if (this.consume(':')) {
       if (this.peek('name', '(', '$')) {
-        return ['apply', this.name_or_paren()];
+        return ['apply', this.name_or_paren(), []];
       }
     }
     return this.parse_value();
@@ -131,18 +131,16 @@ export class Parser {
 
   expression() {
     const vars = [], vals = [];
-    let constant = null,
-        applications = [];
-    [constant, applications] = this.subexpression();
+    let subexpr = this.subexpression();
     while (this.consume('.:')) {
       if (!this.consume('name')) {
         this.error('target expected for assignment');
       }
       vars.push(this.consumed());
-      vals.push(['expression', constant, applications]);
-      [constant, applications] = this.subexpression();
+      vals.push(['expression', ...subexpr]);
+      subexpr = this.subexpression();
     }
-    const ret = ['expression', constant, applications];
+    const ret = ['expression', ...subexpr];
     return vars.length !== 0 ? ['binding', vars, vals, ret] : ret;
   }
 
@@ -169,7 +167,7 @@ export class Parser {
     }
     
     pretty() {
-      const pos = this.position();
+      const pos = this.parser.position();
       // TODO
     }
   };

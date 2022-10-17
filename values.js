@@ -42,7 +42,7 @@ export function type_string(v) {
   } else if (v instanceof Char) {
     return "character";
   } else if (typeof v === "bigint") {
-    return "integer";
+    return "number";
   } else if (typeof v === "number") {
     return "number";
   }
